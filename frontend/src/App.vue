@@ -239,10 +239,10 @@ const navItems = computed(() => {
 }
 
 .nav--scrolled {
-  background: rgba(10, 10, 12, 0.85);
+  background: rgba(10, 10, 12, 0.95);
   backdrop-filter: blur(20px) saturate(1.2);
   -webkit-backdrop-filter: blur(20px) saturate(1.2);
-  border-bottom: 1px solid var(--border-subtle);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .nav__inner {
