@@ -18,10 +18,12 @@ const fetchDashboard = async () => {
       total_ratings: res.total_ratings,
       total_users: res.total_users
     }
+    // 先显示容器，再渲染图表
+    loading.value = false
     await nextTick()
     renderRatingChart(res.rating_distribution)
     renderGenreChart(res.genre_distribution)
-  } finally {
+  } catch {
     loading.value = false
   }
 }
@@ -34,6 +36,7 @@ const chartTheme = {
 }
 
 const renderRatingChart = (data) => {
+  if (!ratingChartRef.value) return
   const chart = echarts.init(ratingChartRef.value)
   chart.setOption({
     tooltip: {
@@ -77,6 +80,7 @@ const renderRatingChart = (data) => {
 }
 
 const renderGenreChart = (data) => {
+  if (!genreChartRef.value) return
   const chart = echarts.init(genreChartRef.value)
   const colors = [
     '#e8a838', '#d4783c', '#b85c3a', '#8a4a38',
