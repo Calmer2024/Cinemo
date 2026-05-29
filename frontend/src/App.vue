@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
@@ -8,11 +8,22 @@ const route = useRoute()
 
 const user = ref(null)
 const isLoggedIn = computed(() => !!localStorage.getItem('token'))
+const scrolled = ref(false)
+const mobileMenuOpen = ref(false)
 
 onMounted(() => {
   const saved = localStorage.getItem('user')
   if (saved) user.value = JSON.parse(saved)
+  window.addEventListener('scroll', handleScroll)
 })
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', handleScroll)
+})
+
+const handleScroll = () => {
+  scrolled.value = window.scrollY > 20
+}
 
 const handleLogout = () => {
   localStorage.removeItem('token')
@@ -23,178 +34,426 @@ const handleLogout = () => {
 }
 
 const activeMenu = computed(() => route.path)
+
+const navItems = computed(() => {
+  const items = [
+    { path: '/', label: '发现', icon: 'discover' },
+    { path: '/dashboard', label: '数据', icon: 'chart' },
+  ]
+  if (isLoggedIn.value) {
+    items.push({ path: '/recommend', label: '推荐', icon: 'magic' })
+    items.push({ path: '/my-ratings', label: '我的', icon: 'star' })
+  }
+  return items
+})
 </script>
 
 <template>
-  <el-container class="app-container">
-    <!-- 顶部导航栏 -->
-    <el-header class="app-header">
-      <div class="header-content">
-        <div class="logo" @click="router.push('/')">
-          <el-icon><Film /></el-icon>
-          <span>电影推荐系统</span>
+  <div class="app-shell">
+    <!-- Navigation -->
+    <header class="nav" :class="{ 'nav--scrolled': scrolled }">
+      <div class="nav__inner">
+        <div class="nav__brand" @click="router.push('/')">
+          <div class="nav__logo">
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+              <rect x="2" y="4" width="24" height="20" rx="4" stroke="currentColor" stroke-width="2"/>
+              <circle cx="10" cy="14" r="3" fill="currentColor"/>
+              <circle cx="18" cy="14" r="3" fill="currentColor"/>
+              <path d="M2 8h24" stroke="currentColor" stroke-width="1.5" opacity="0.4"/>
+            </svg>
+          </div>
+          <span class="nav__brand-text">Cinemo</span>
         </div>
 
-        <el-menu
-          :default-active="activeMenu"
-          mode="horizontal"
-          :ellipsis="false"
-          class="nav-menu"
-          router
-        >
-          <el-menu-item index="/">
-            <el-icon><HomeFilled /></el-icon>
-            <span>首页</span>
-          </el-menu-item>
-          <el-menu-item index="/dashboard">
-            <el-icon><DataAnalysis /></el-icon>
-            <span>数据看板</span>
-          </el-menu-item>
-          <el-menu-item v-if="isLoggedIn" index="/recommend">
-            <el-icon><MagicStick /></el-icon>
-            <span>个性推荐</span>
-          </el-menu-item>
-          <el-menu-item v-if="isLoggedIn" index="/my-ratings">
-            <el-icon><Star /></el-icon>
-            <span>我的评分</span>
-          </el-menu-item>
-        </el-menu>
+        <nav class="nav__links">
+          <router-link
+            v-for="item in navItems"
+            :key="item.path"
+            :to="item.path"
+            class="nav__link"
+            :class="{ 'nav__link--active': activeMenu === item.path }"
+          >
+            {{ item.label }}
+          </router-link>
+        </nav>
 
-        <div class="header-actions">
+        <div class="nav__actions">
           <template v-if="isLoggedIn">
-            <el-dropdown @command="handleLogout">
-              <span class="user-info">
-                <el-avatar :size="32" icon="UserFilled" />
-                <span class="username">{{ user?.username || '用户' }}</span>
-              </span>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item command="logout">退出登录</el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
+            <div class="nav__user" @click="handleLogout">
+              <div class="nav__avatar">
+                {{ user?.username?.charAt(0)?.toUpperCase() || 'U' }}
+              </div>
+              <span class="nav__username">{{ user?.username || '用户' }}</span>
+            </div>
           </template>
           <template v-else>
-            <el-button type="primary" @click="router.push('/login')">登录</el-button>
-            <el-button @click="router.push('/register')">注册</el-button>
+            <button class="btn btn--ghost" @click="router.push('/login')">登录</button>
+            <button class="btn btn--accent" @click="router.push('/register')">注册</button>
           </template>
         </div>
+
+        <!-- Mobile menu toggle -->
+        <button class="nav__mobile-toggle" @click="mobileMenuOpen = !mobileMenuOpen">
+          <span :class="{ 'is-open': mobileMenuOpen }"></span>
+        </button>
       </div>
-    </el-header>
 
-    <!-- 主内容区 -->
-    <el-main class="app-main">
-      <router-view />
-    </el-main>
+      <!-- Mobile menu -->
+      <transition name="slide-down">
+        <div v-if="mobileMenuOpen" class="nav__mobile-menu">
+          <router-link
+            v-for="item in navItems"
+            :key="item.path"
+            :to="item.path"
+            class="nav__mobile-link"
+            @click="mobileMenuOpen = false"
+          >
+            {{ item.label }}
+          </router-link>
+          <div class="nav__mobile-actions">
+            <template v-if="isLoggedIn">
+              <button class="btn btn--ghost" style="width:100%" @click="handleLogout">退出登录</button>
+            </template>
+            <template v-else>
+              <button class="btn btn--ghost" style="width:100%" @click="router.push('/login'); mobileMenuOpen = false">登录</button>
+              <button class="btn btn--accent" style="width:100%" @click="router.push('/register'); mobileMenuOpen = false">注册</button>
+            </template>
+          </div>
+        </div>
+      </transition>
+    </header>
 
-    <!-- 底部 -->
-    <el-footer class="app-footer">
-      <p>云计算课程大作业 - 电影推荐系统 | 武汉大学计算机学院</p>
-    </el-footer>
-  </el-container>
+    <!-- Main Content -->
+    <main class="main">
+      <router-view v-slot="{ Component }">
+        <transition name="page" mode="out-in">
+          <component :is="Component" />
+        </transition>
+      </router-view>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="footer__inner">
+        <div class="footer__brand">
+          <span class="footer__logo">Cinemo</span>
+          <span class="footer__sep">-</span>
+          <span class="footer__tagline">智能电影推荐系统</span>
+        </div>
+        <p class="footer__copy">武汉大学计算机学院 - 云计算平台与技术课程</p>
+      </div>
+    </footer>
+  </div>
 </template>
 
-<style>
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+<style scoped>
+/* --- Navigation --- */
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  padding: 0 24px;
+  transition: all 0.3s var(--ease-out-expo);
+  background: transparent;
 }
 
-body {
-  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB',
-    'Microsoft YaHei', Arial, sans-serif;
-  background-color: #f5f7fa;
+.nav--scrolled {
+  background: rgba(10, 10, 12, 0.85);
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
-.app-container {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-.app-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-  padding: 0;
-  height: 60px !important;
-}
-
-.header-content {
-  max-width: 1200px;
+.nav__inner {
+  max-width: 1280px;
   margin: 0 auto;
   display: flex;
   align-items: center;
-  height: 100%;
-  padding: 0 20px;
+  justify-content: space-between;
+  height: 72px;
 }
 
-.logo {
+.nav__brand {
   display: flex;
   align-items: center;
-  gap: 8px;
-  color: white;
-  font-size: 18px;
-  font-weight: bold;
+  gap: 10px;
   cursor: pointer;
-  margin-right: 40px;
-  white-space: nowrap;
+  transition: opacity 0.2s ease;
 }
 
-.logo .el-icon {
-  font-size: 24px;
+.nav__brand:hover {
+  opacity: 0.8;
 }
 
-.nav-menu {
-  flex: 1;
-  background: transparent !important;
-  border: none !important;
+.nav__logo {
+  color: var(--accent);
+  display: flex;
 }
 
-.nav-menu .el-menu-item {
-  color: rgba(255, 255, 255, 0.85) !important;
-  border-bottom: none !important;
-  height: 60px;
-  line-height: 60px;
+.nav__brand-text {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
 }
 
-.nav-menu .el-menu-item:hover,
-.nav-menu .el-menu-item.is-active {
-  color: #fff !important;
-  background: rgba(255, 255, 255, 0.15) !important;
+.nav__links {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.header-actions {
+.nav__link {
+  padding: 8px 16px;
+  border-radius: var(--radius-pill);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.nav__link:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+  opacity: 1;
+}
+
+.nav__link--active {
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.nav__actions {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.user-info {
+.nav__user {
   display: flex;
   align-items: center;
-  gap: 8px;
-  color: white;
+  gap: 10px;
   cursor: pointer;
+  padding: 6px 12px 6px 6px;
+  border-radius: var(--radius-pill);
+  transition: background 0.2s ease;
 }
 
-.username {
+.nav__user:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.nav__avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--text-on-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 14px;
+  font-weight: 600;
 }
 
-.app-main {
-  flex: 1;
-  max-width: 1200px;
-  width: 100%;
+.nav__username {
+  font-size: 14px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.nav__mobile-toggle {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  position: relative;
+}
+
+.nav__mobile-toggle span,
+.nav__mobile-toggle span::before,
+.nav__mobile-toggle span::after {
+  display: block;
+  width: 20px;
+  height: 2px;
+  background: var(--text-primary);
+  border-radius: 2px;
+  transition: all 0.3s ease;
+  position: absolute;
+  left: 6px;
+}
+
+.nav__mobile-toggle span { top: 15px; }
+.nav__mobile-toggle span::before { content: ''; top: -6px; }
+.nav__mobile-toggle span::after { content: ''; top: 6px; }
+
+.nav__mobile-toggle span.is-open { background: transparent; }
+.nav__mobile-toggle span.is-open::before { top: 0; transform: rotate(45deg); }
+.nav__mobile-toggle span.is-open::after { top: 0; transform: rotate(-45deg); }
+
+.nav__mobile-menu {
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 0 24px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.nav__mobile-link {
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.nav__mobile-link:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+  opacity: 1;
+}
+
+.nav__mobile-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* --- Buttons --- */
+.btn {
+  padding: 8px 20px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s var(--ease-out-expo);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn--accent {
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.btn--accent:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-glow);
+}
+
+.btn--accent:active {
+  transform: translateY(0);
+}
+
+.btn--ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-medium);
+}
+
+.btn--ghost:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+/* --- Main Content --- */
+.main {
+  min-height: 100vh;
+  padding-top: 72px;
+}
+
+/* --- Footer --- */
+.footer {
+  border-top: 1px solid var(--border-subtle);
+  padding: 40px 24px;
+  margin-top: var(--section-gap);
+}
+
+.footer__inner {
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 24px 20px;
+  text-align: center;
 }
 
-.app-footer {
-  text-align: center;
-  color: #909399;
+.footer__brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.footer__logo {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.footer__sep {
+  color: var(--text-tertiary);
+}
+
+.footer__tagline {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.footer__copy {
   font-size: 13px;
-  padding: 16px;
-  background: #f5f7fa;
+  color: var(--text-tertiary);
+  margin: 0;
+}
+
+/* --- Page Transitions --- */
+.page-enter-active {
+  animation: fadeInUp 0.4s var(--ease-out-expo);
+}
+
+.page-leave-active {
+  animation: fadeIn 0.2s ease reverse;
+}
+
+.slide-down-enter-active {
+  animation: fadeInUp 0.3s var(--ease-out-expo);
+}
+
+.slide-down-leave-active {
+  animation: fadeIn 0.2s ease reverse;
+}
+
+/* --- Responsive --- */
+@media (max-width: 768px) {
+  .nav__links,
+  .nav__actions {
+    display: none;
+  }
+
+  .nav__mobile-toggle {
+    display: block;
+  }
+
+  .nav__mobile-menu {
+    display: flex;
+  }
+
+  .nav__inner {
+    height: 60px;
+  }
+
+  .main {
+    padding-top: 60px;
+  }
 }
 </style>
