@@ -85,6 +85,14 @@ onMounted(() => {
 
       <!-- Main Content -->
       <div class="detail-content">
+        <!-- Back Button -->
+        <button class="back-btn animate-fade-in" @click="$router.back()">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M11 4L6 9l5 5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          返回
+        </button>
+
         <!-- Hero Section -->
         <section class="detail-hero animate-fade-in-up">
           <div class="detail-hero__poster">
@@ -277,6 +285,30 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 48px;
+}
+
+/* Back Button */
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  align-self: flex-start;
+}
+
+.back-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--border-medium);
+  background: var(--bg-card);
 }
 
 /* Hero */
