@@ -11,6 +11,7 @@ const loading = ref(false)
 const currentPage = ref(1)
 const pageSize = ref(12)
 const total = ref(0)
+const movieGridRef = ref(null)
 
 const searchQuery = ref('')
 const selectedGenre = ref('')
@@ -59,6 +60,8 @@ const goToDetail = (id) => {
 let observer = null
 const observeCards = () => {
   if (observer) observer.disconnect()
+  if (!movieGridRef.value) return
+
   observer = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
       if (entry.isIntersecting) {
@@ -66,9 +69,10 @@ const observeCards = () => {
         observer.unobserve(entry.target)
       }
     })
-  }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' })
+  }, { threshold: 0.05, rootMargin: '0px 0px -20px 0px' })
 
-  document.querySelectorAll('.movie-card').forEach((el, i) => {
+  const cards = movieGridRef.value.querySelectorAll('.movie-card')
+  cards.forEach((el, i) => {
     el.style.animationDelay = `${i * 0.06}s`
     observer.observe(el)
   })
@@ -159,7 +163,7 @@ onMounted(() => {
         </div>
       </div>
 
-      <div v-else class="movie-grid">
+      <div v-else class="movie-grid" ref="movieGridRef">
         <article
           v-for="movie in movies"
           :key="movie.id"
@@ -433,8 +437,6 @@ onMounted(() => {
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   transition: all 0.35s var(--ease-out-expo);
-  opacity: 0;
-  transform: translateY(20px);
 }
 
 .movie-card.is-visible {

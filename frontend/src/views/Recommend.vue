@@ -8,6 +8,7 @@ const router = useRouter()
 const recommendations = ref([])
 const loading = ref(false)
 const triggering = ref(false)
+const recGridRef = ref(null)
 
 const fetchRecommendations = async () => {
   loading.value = true
@@ -37,6 +38,8 @@ const triggerSpark = async () => {
 let observer = null
 const observeCards = () => {
   if (observer) observer.disconnect()
+  if (!recGridRef.value) return
+
   observer = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
       if (entry.isIntersecting) {
@@ -44,8 +47,10 @@ const observeCards = () => {
         observer.unobserve(entry.target)
       }
     })
-  }, { threshold: 0.1 })
-  document.querySelectorAll('.rec-card').forEach((el, i) => {
+  }, { threshold: 0.05 })
+
+  const cards = recGridRef.value.querySelectorAll('.rec-card')
+  cards.forEach((el, i) => {
     el.style.animationDelay = `${i * 0.06}s`
     observer.observe(el)
   })
@@ -87,7 +92,7 @@ onMounted(fetchRecommendations)
     </div>
 
     <!-- Recommendations -->
-    <div v-else-if="recommendations.length > 0" class="rec-grid">
+    <div v-else-if="recommendations.length > 0" class="rec-grid" ref="recGridRef">
       <article
         v-for="rec in recommendations"
         :key="rec.id"
@@ -171,8 +176,6 @@ onMounted(fetchRecommendations)
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   transition: all 0.35s var(--ease-out-expo);
-  opacity: 0;
-  transform: translateY(20px);
 }
 
 .rec-card.is-visible {
