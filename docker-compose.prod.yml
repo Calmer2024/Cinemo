@@ -1,25 +1,21 @@
-# 华为云生产环境部署配置
 version: '3.8'
 
 services:
-  # GaussDB 数据库
+  # GaussDB 数据库 (轻量化配置，适配 4GB 内存服务器)
   gaussdb:
     image: enmotech/opengauss:5.0.0
     container_name: gaussdb
     environment:
-      GS_USERNAME: gaussdb
       GS_PASSWORD: Gaussdb@2024
       GS_DB: movie_db
-      GS_PORT: 5432
     ports:
       - "5432:5432"
     volumes:
       - gaussdb_data:/var/lib/opengauss
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U gaussdb -d movie_db"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 2G
     restart: unless-stopped
 
   # 后端 Flask 应用
@@ -34,8 +30,7 @@ services:
     ports:
       - "5000:5000"
     depends_on:
-      gaussdb:
-        condition: service_healthy
+      - gaussdb
     restart: unless-stopped
 
   # 前端 Vue 应用

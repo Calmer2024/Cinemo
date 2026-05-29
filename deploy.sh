@@ -1,49 +1,43 @@
 #!/bin/bash
-# 华为云部署脚本
+# 华为云部署脚本 (轻量化配置)
 
 echo "=========================================="
 echo "  电影推荐系统 - 华为云部署脚本"
 echo "=========================================="
 
-# 1. 检查 Docker 是否安装
-echo "[1/6] 检查 Docker 环境..."
+# 1. 检查 Docker
+echo "[1/7] 检查 Docker 环境..."
 if ! command -v docker &> /dev/null; then
-    echo "错误: Docker 未安装，请先安装 Docker"
+    echo "错误: Docker 未安装"
     exit 1
 fi
-echo "  Docker 已安装: $(docker --version)"
+echo "  Docker 已安装"
 
-# 2. 检查 Docker Compose 是否安装
-if ! command -v docker-compose &> /dev/null; then
-    echo "错误: Docker Compose 未安装"
-    exit 1
-fi
-echo "  Docker Compose 已安装"
-
-# 3. 停止旧容器
-echo "[2/6] 停止旧容器..."
+# 2. 停止旧容器
+echo "[2/7] 停止旧容器..."
 docker-compose -f docker-compose.prod.yml down 2>/dev/null
+docker rm -f gaussdb 2>/dev/null
 
-# 4. 启动 GaussDB
-echo "[3/6] 启动 GaussDB 数据库..."
+# 3. 启动 GaussDB (轻量化)
+echo "[3/7] 启动 GaussDB (内存限制 2GB)..."
 docker-compose -f docker-compose.prod.yml up -d gaussdb
 
-# 5. 等待 GaussDB 就绪
-echo "[4/6] 等待 GaussDB 启动..."
-sleep 30
-
-# 检查 GaussDB 是否健康
-for i in {1..30}; do
+# 4. 等待 GaussDB 启动
+echo "[4/7] 等待 GaussDB 启动 (约60秒)..."
+for i in {1..60}; do
     if docker exec gaussdb pg_isready -U gaussdb -d movie_db &>/dev/null; then
-        echo "  GaussDB 已就绪"
+        echo "  GaussDB 已就绪!"
         break
     fi
-    echo "  等待中... ($i/30)"
+    if [ $i -eq 60 ]; then
+        echo "  超时，请检查日志: docker logs gaussdb"
+        exit 1
+    fi
     sleep 2
 done
 
-# 6. 初始化数据库
-echo "[5/6] 初始化数据库..."
+# 5. 创建数据库表
+echo "[5/7] 创建数据库表..."
 docker exec gaussdb psql -U gaussdb -d movie_db -c "
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
@@ -53,7 +47,6 @@ CREATE TABLE IF NOT EXISTS users (
     avatar VARCHAR(256) DEFAULT '',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
 CREATE TABLE IF NOT EXISTS movies (
     id SERIAL PRIMARY KEY,
     title VARCHAR(200) NOT NULL,
@@ -66,7 +59,6 @@ CREATE TABLE IF NOT EXISTS movies (
     avg_rating FLOAT DEFAULT 0.0,
     rating_count INTEGER DEFAULT 0
 );
-
 CREATE TABLE IF NOT EXISTS ratings (
     id SERIAL PRIMARY KEY,
     user_id INTEGER REFERENCES users(id) NOT NULL,
@@ -76,7 +68,6 @@ CREATE TABLE IF NOT EXISTS ratings (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, movie_id)
 );
-
 CREATE TABLE IF NOT EXISTS recommendations (
     id SERIAL PRIMARY KEY,
     user_id INTEGER REFERENCES users(id) NOT NULL,
@@ -88,22 +79,22 @@ CREATE TABLE IF NOT EXISTS recommendations (
 "
 echo "  数据库表创建完成"
 
-# 7. 构建并启动所有服务
-echo "[6/6] 构建并启动所有服务..."
-docker-compose -f docker-compose.prod.yml up -d --build
+# 6. 构建并启动后端和前端
+echo "[6/7] 构建并启动后端和前端..."
+docker-compose -f docker-compose.prod.yml up -d --build backend frontend
+
+echo "[7/7] 等待服务启动..."
+sleep 30
 
 echo ""
 echo "=========================================="
 echo "  部署完成！"
 echo "=========================================="
 echo ""
-echo "访问地址:"
-echo "  前端: http://$(hostname -I | awk '{print $1}'):80"
-echo "  后端 API: http://$(hostname -I | awk '{print $1}'):5000"
+echo "访问地址: http://$(curl -s ifconfig.me)"
 echo ""
-echo "测试账号:"
-echo "  需要运行 seed_data.py 初始化测试数据"
+echo "测试账号: alice / 123456"
 echo ""
-echo "查看日志:"
-echo "  docker-compose -f docker-compose.prod.yml logs -f"
+echo "查看状态: docker-compose -f docker-compose.prod.yml ps"
+echo "查看日志: docker-compose -f docker-compose.prod.yml logs -f"
 echo ""
