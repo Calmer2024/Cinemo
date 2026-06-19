@@ -16,6 +16,17 @@ const movieGridRef = ref(null)
 const searchQuery = ref('')
 const selectedGenre = ref('')
 const sortBy = ref('rating')
+const brokenPosters = ref(new Set())
+
+const posterKey = (movie) => movie?.id ?? movie?.poster_url
+
+const hasPoster = (movie) => {
+  return !!movie?.poster_url && !brokenPosters.value.has(posterKey(movie))
+}
+
+const markPosterBroken = (movie) => {
+  brokenPosters.value = new Set(brokenPosters.value).add(posterKey(movie))
+}
 
 const fetchMovies = async () => {
   loading.value = true
@@ -172,10 +183,11 @@ onMounted(() => {
         >
           <div class="movie-card__poster">
             <img
-              v-if="movie.poster_url"
+              v-if="hasPoster(movie)"
               :src="movie.poster_url"
               :alt="movie.title"
               loading="lazy"
+              @error.stop="markPosterBroken(movie)"
             />
             <div v-else class="movie-card__placeholder">
               <svg width="48" height="48" viewBox="0 0 48 48" fill="none">

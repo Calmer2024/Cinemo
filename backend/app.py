@@ -1,8 +1,37 @@
+import re
 from flask import Flask
 from flask_cors import CORS
+from sqlalchemy.dialects.postgresql.base import PGDialect
 
 from config import Config
 from models import db
+
+# Monkey-patch: 让 SQLAlchemy 兼容 openGauss 的版本号格式
+# openGauss 返回的版本字符串类似: "(openGauss 5.0.0 build ) compiled at ..."
+_original_get_server_version_info = PGDialect._get_server_version_info
+
+
+def _patched_get_server_version_info(self, connection):
+    from sqlalchemy import text
+    cursor = connection.execute(
+        text("SELECT version() AS server_version")
+    )
+    row = cursor.fetchone()
+    if not row:
+        raise AssertionError("Could not retrieve server version info")
+    version_str = row[0]
+    # Try standard PostgreSQL format first
+    match = re.search(
+        r"(\d+)\.(\d+)(?:\.(\d+))?", version_str
+    )
+    if match:
+        return tuple(int(x) for x in match.group(1, 2, 3) if x is not None)
+    raise AssertionError(
+        f"Could not determine version from string {version_str!r}"
+    )
+
+
+PGDialect._get_server_version_info = _patched_get_server_version_info
 
 from routes.auth import auth_bp
 from routes.movies import movies_bp

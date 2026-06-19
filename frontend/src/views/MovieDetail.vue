@@ -1,12 +1,12 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { moviesAPI, ratingsAPI, recommendationsAPI } from '../api'
 
 const route = useRoute()
 const router = useRouter()
-const movieId = route.params.id
+const movieId = ref(route.params.id)
 
 const movie = ref(null)
 const ratings = ref([])
@@ -20,11 +20,22 @@ const submitting = ref(false)
 
 const ratingsPage = ref(1)
 const ratingsTotal = ref(0)
+const brokenPosters = ref(new Set())
+
+const posterKey = (item, scope = 'poster') => `${scope}:${item?.id ?? item?.poster_url}`
+
+const hasPoster = (item, scope = 'poster') => {
+  return !!item?.poster_url && !brokenPosters.value.has(posterKey(item, scope))
+}
+
+const markPosterBroken = (item, scope = 'poster') => {
+  brokenPosters.value = new Set(brokenPosters.value).add(posterKey(item, scope))
+}
 
 const fetchMovie = async () => {
   loading.value = true
   try {
-    const res = await moviesAPI.get(movieId)
+    const res = await moviesAPI.get(movieId.value)
     movie.value = res.movie
   } finally {
     loading.value = false
@@ -32,13 +43,13 @@ const fetchMovie = async () => {
 }
 
 const fetchRatings = async () => {
-  const res = await ratingsAPI.getByMovie(movieId, { page: ratingsPage.value, per_page: 10 })
+  const res = await ratingsAPI.getByMovie(movieId.value, { page: ratingsPage.value, per_page: 10 })
   ratings.value = res.ratings
   ratingsTotal.value = res.total
 }
 
 const fetchSimilar = async () => {
-  const res = await recommendationsAPI.similar(movieId)
+  const res = await recommendationsAPI.similar(movieId.value)
   similarMovies.value = res.similar
 }
 
@@ -50,7 +61,7 @@ const submitRating = async () => {
   submitting.value = true
   try {
     await ratingsAPI.create({
-      movie_id: parseInt(movieId),
+      movie_id: parseInt(movieId.value),
       score: myScore.value,
       review: myReview.value
     })
@@ -67,13 +78,28 @@ const submitRating = async () => {
 
 const scoreLabels = ['很差', '较差', '一般', '推荐', '力荐']
 
-onMounted(() => {
-  // 进入页面自动滚动到顶部
+const loadAll = () => {
   window.scrollTo({ top: 0, behavior: 'instant' })
+  movie.value = null
+  ratings.value = []
+  similarMovies.value = []
+  myScore.value = 0
+  myReview.value = ''
+  ratingsPage.value = 1
   fetchMovie()
   fetchRatings()
   fetchSimilar()
+}
+
+// 监听路由参数变化，同一组件复用时重新加载
+watch(() => route.params.id, (newId) => {
+  if (newId) {
+    movieId.value = newId
+    loadAll()
+  }
 })
+
+onMounted(loadAll)
 </script>
 
 <template>
@@ -81,7 +107,12 @@ onMounted(() => {
     <template v-if="movie">
       <!-- Backdrop -->
       <div class="detail-backdrop">
-        <img v-if="movie.poster_url" :src="movie.poster_url" :alt="movie.title" />
+        <img
+          v-if="hasPoster(movie, 'backdrop')"
+          :src="movie.poster_url"
+          :alt="movie.title"
+          @error.stop="markPosterBroken(movie, 'backdrop')"
+        />
         <div class="detail-backdrop__overlay"></div>
       </div>
 
@@ -99,7 +130,12 @@ onMounted(() => {
         </div>
         <section class="detail-hero animate-fade-in-up">
           <div class="detail-hero__poster">
-            <img v-if="movie.poster_url" :src="movie.poster_url" :alt="movie.title" />
+            <img
+              v-if="hasPoster(movie)"
+              :src="movie.poster_url"
+              :alt="movie.title"
+              @error.stop="markPosterBroken(movie)"
+            />
             <div v-else class="poster-fallback">
               <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
                 <rect x="6" y="10" width="36" height="28" rx="4" stroke="currentColor" stroke-width="2"/>
@@ -229,7 +265,13 @@ onMounted(() => {
               @click="router.push(`/movie/${m.id}`)"
             >
               <div class="similar-card__poster">
-                <img v-if="m.poster_url" :src="m.poster_url" :alt="m.title" />
+                <img
+                  v-if="hasPoster(m, 'similar')"
+                  :src="m.poster_url"
+                  :alt="m.title"
+                  loading="lazy"
+                  @error.stop="markPosterBroken(m, 'similar')"
+                />
                 <div v-else class="poster-fallback-sm">
                   <svg width="32" height="32" viewBox="0 0 48 48" fill="none">
                     <rect x="6" y="10" width="36" height="28" rx="4" stroke="currentColor" stroke-width="2"/>

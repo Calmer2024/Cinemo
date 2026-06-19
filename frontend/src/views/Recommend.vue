@@ -9,6 +9,17 @@ const recommendations = ref([])
 const loading = ref(false)
 const triggering = ref(false)
 const recGridRef = ref(null)
+const brokenPosters = ref(new Set())
+
+const posterKey = (rec) => rec?.movie?.id ?? rec?.movie?.poster_url
+
+const hasPoster = (rec) => {
+  return !!rec?.movie?.poster_url && !brokenPosters.value.has(posterKey(rec))
+}
+
+const markPosterBroken = (rec) => {
+  brokenPosters.value = new Set(brokenPosters.value).add(posterKey(rec))
+}
 
 const fetchRecommendations = async () => {
   loading.value = true
@@ -100,7 +111,13 @@ onMounted(fetchRecommendations)
         @click="router.push(`/movie/${rec.movie_id}`)"
       >
         <div class="rec-card__poster">
-          <img v-if="rec.movie?.poster_url" :src="rec.movie.poster_url" :alt="rec.movie?.title" loading="lazy" />
+          <img
+            v-if="hasPoster(rec)"
+            :src="rec.movie.poster_url"
+            :alt="rec.movie?.title"
+            loading="lazy"
+            @error.stop="markPosterBroken(rec)"
+          />
           <div v-else class="rec-card__fallback">
             <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
               <rect x="6" y="10" width="36" height="28" rx="4" stroke="currentColor" stroke-width="2"/>

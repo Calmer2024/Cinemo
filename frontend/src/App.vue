@@ -272,10 +272,12 @@ const navItems = computed(() => {
 }
 
 .nav__brand-text {
-  font-size: 20px;
+  font-family: 'Dancing Script', 'Georgia', serif;
+  font-size: 28px;
   font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--text-primary);
+  letter-spacing: 0.01em;
+  color: var(--accent);
+  text-shadow: 0 0 20px rgba(232, 168, 56, 0.2);
 }
 
 .nav__links {
@@ -503,32 +505,49 @@ const navItems = computed(() => {
 
 /* --- Buttons --- */
 .btn {
-  padding: 8px 20px;
-  border-radius: var(--radius-sm);
+  padding: 10px 24px;
+  border-radius: var(--radius-pill);
   font-size: 14px;
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
   border: none;
-  transition: all 0.2s var(--ease-out-expo);
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  letter-spacing: 0.01em;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, transparent 40%, rgba(255,255,255,0.15) 50%, transparent 60%);
+  transform: translateX(-100%);
+  transition: transform 0.5s ease;
+}
+
+.btn:hover::after {
+  transform: translateX(100%);
 }
 
 .btn--accent {
-  background: var(--accent);
-  color: var(--text-on-accent);
+  background: linear-gradient(135deg, var(--accent), #f0b848);
+  color: #1a1a1a;
+  box-shadow: 0 2px 12px rgba(232, 168, 56, 0.3);
 }
 
 .btn--accent:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-glow);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(232, 168, 56, 0.4);
 }
 
 .btn--accent:active {
-  transform: translateY(0);
+  transform: translateY(0) scale(0.98);
 }
 
 .btn--ghost {
@@ -540,6 +559,7 @@ const navItems = computed(() => {
 .btn--ghost:hover {
   color: var(--text-primary);
   border-color: var(--accent);
+  background: rgba(232, 168, 56, 0.06);
 }
 
 /* --- Main Content --- */
@@ -569,6 +589,10 @@ const navItems = computed(() => {
   margin-bottom: 8px;
 }
 
+.footer__brand .footer__logo {
+  font-family: 'Dancing Script', 'Georgia', serif;
+  font-size: 22px;
+}
 .footer__logo {
   font-size: 16px;
   font-weight: 700;

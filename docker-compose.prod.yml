@@ -1,21 +1,22 @@
-version: '3.8'
-
 services:
-  # GaussDB 数据库 (轻量化配置，适配 4GB 内存服务器)
+  # openGauss 数据库 (使用官方镜像)
   gaussdb:
-    image: enmotech/opengauss:5.0.0
+    image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/opengauss/opengauss:5.0.0
     container_name: gaussdb
+    hostname: gaussdb
+    privileged: true
     environment:
-      GS_PASSWORD: Gaussdb@2024
+      GS_PASSWORD: GaussDB@2024
       GS_DB: movie_db
+      GS_PORT: 5432
+      GS_HOST_AUTH_METHOD: md5
+      OTHER_PG_CONF: "password_encryption_type = 0\npassword_reuse_time = 0"
+      LC_ALL: en_US.utf8
+      LANG: en_US.utf8
     ports:
       - "5432:5432"
     volumes:
-      - gaussdb_data:/var/lib/opengauss
-    deploy:
-      resources:
-        limits:
-          memory: 2G
+      - gaussdb_data:/var/lib/opengauss/data
     restart: unless-stopped
 
   # 后端 Flask 应用
@@ -25,7 +26,11 @@ services:
       dockerfile: Dockerfile
     container_name: movie-backend
     environment:
-      DATABASE_URL: postgresql://gaussdb:Gaussdb@2024@gaussdb:5432/movie_db
+      DB_HOST: gaussdb
+      DB_PORT: "5432"
+      DB_USER: gaussdb
+      DB_PASSWORD: GaussDB@2024
+      DB_NAME: movie_db
       SECRET_KEY: cinemo-production-secret-key-2024
     ports:
       - "5000:5000"

@@ -1,0 +1,36 @@
+POSTER_PATH_BY_TITLE = {
+    "肖申克的救赎": "/posters/movie-01.jpg",
+    "霸王别姬": "/posters/movie-02.jpg",
+    "阿甘正传": "/posters/movie-03.jpg",
+    "泰坦尼克号": "/posters/movie-04.jpg",
+    "千与千寻": "/posters/movie-05.jpg",
+    "辛德勒的名单": "/posters/movie-06.jpg",
+    "盗梦空间": "/posters/movie-07.jpg",
+    "星际穿越": "/posters/movie-08.jpg",
+    "这个杀手不太冷": "/posters/movie-09.jpg",
+    "楚门的世界": "/posters/movie-10.jpg",
+    "忠犬八公的故事": "/posters/movie-11.jpg",
+    "海上钢琴师": "/posters/movie-12.jpg",
+    "三傻大闹宝莱坞": "/posters/movie-13.jpg",
+    "机器人总动员": "/posters/movie-14.jpg",
+    "放牛班的春天": "/posters/movie-15.jpg",
+    "大话西游之大圣娶亲": "/posters/movie-16.jpg",
+    "教父": "/posters/movie-17.jpg",
+    "龙猫": "/posters/movie-18.jpg",
+    "当幸福来敲门": "/posters/movie-19.jpg",
+    "飞屋环游记": "/posters/movie-20.jpg",
+    "控方证人": "/posters/movie-21.jpg",
+    "蝙蝠侠：黑暗骑士": "/posters/movie-22.jpg",
+    "指环王：王者归来": "/posters/movie-23.jpg",
+    "天堂电影院": "/posters/movie-24.jpg",
+    "搏击俱乐部": "/posters/movie-25.jpg",
+    "哈利·波特与魔法石": "/posters/movie-26.jpg",
+    "少年派的奇幻漂流": "/posters/movie-27.jpg",
+    "无间道": "/posters/movie-28.jpg",
+    "摔跤吧！爸爸": "/posters/movie-29.jpg",
+    "疯狂动物城": "/posters/movie-30.jpg",
+}
+
+
+def poster_path_for_title(title):
+    return POSTER_PATH_BY_TITLE.get(title, "")

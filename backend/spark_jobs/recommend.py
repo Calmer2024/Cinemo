@@ -1,13 +1,9 @@
 """
 Spark ALS 协同过滤推荐算法
-从 GaussDB 读取评分数据 → 训练 ALS 模型 → 预测评分 → 写回数据库
+从 GaussDB 读取评分数据 -> 训练 ALS 模型 -> 预测评分 -> 写回数据库
 """
 import os
 import sys
-
-# Windows 上 PySpark 需要设置 PYSPARK_PYTHON
-os.environ['PYSPARK_PYTHON'] = sys.executable
-os.environ['PYSPARK_DRIVER_PYTHON'] = sys.executable
 
 # 将项目根目录加入路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -15,36 +11,42 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from pyspark.sql import SparkSession
 from pyspark.ml.recommendation import ALS
 from pyspark.sql.types import IntegerType, FloatType, StructType, StructField
-from pyspark.sql.functions import explode, col, lit, current_timestamp
+from pyspark.sql.functions import explode, col
 
-
+# 数据库配置（从环境变量读取）
 DB_CONFIG = {
-    'host': 'localhost',
-    'port': 5433,
-    'dbname': 'movie_db',
-    'user': 'gaussdb',
-    'password': 'gaussdb123'
+    'host': os.environ.get('DB_HOST', 'localhost'),
+    'port': int(os.environ.get('DB_PORT', '5432')),
+    'dbname': os.environ.get('DB_NAME', 'postgres'),
+    'user': os.environ.get('DB_USER', 'gaussadmin'),
+    'password': os.environ.get('DB_PASSWORD', 'GaussDB@2024'),
 }
 
 
 def get_spark_session():
-    """创建 Spark 会话"""
+    """创建 Spark 会话（轻量化配置）"""
     return SparkSession.builder \
         .appName("MovieRecommender") \
-        .master("local[*]") \
+        .master("local[1]") \
+        .config("spark.driver.memory", "512m") \
+        .config("spark.sql.shuffle.partitions", "2") \
+        .config("spark.ui.enabled", "false") \
         .getOrCreate()
 
 
 def load_ratings_from_db(spark):
     """从数据库加载评分数据"""
-    import psycopg
+    import psycopg2
+    import psycopg2.extensions
+    psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
 
-    conn = psycopg.connect(
+    conn = psycopg2.connect(
         host=DB_CONFIG['host'],
         port=DB_CONFIG['port'],
         dbname=DB_CONFIG['dbname'],
         user=DB_CONFIG['user'],
-        password=DB_CONFIG['password']
+        password=DB_CONFIG['password'],
+        options='-c client_encoding=UTF8'
     )
     cur = conn.cursor()
     cur.execute("SELECT user_id, movie_id, score FROM ratings")
@@ -52,9 +54,8 @@ def load_ratings_from_db(spark):
     cur.close()
     conn.close()
 
-    print(f"  从数据库加载了 {len(rows)} 条评分记录")
+    print(f"  Loaded {len(rows)} ratings from DB")
 
-    # 创建 Spark DataFrame
     schema = StructType([
         StructField("user_id", IntegerType(), True),
         StructField("movie_id", IntegerType(), True),
@@ -65,14 +66,15 @@ def load_ratings_from_db(spark):
 
 def save_recommendations_to_db(recommendations):
     """将推荐结果写回数据库"""
-    import psycopg
+    import psycopg2
 
-    conn = psycopg.connect(
+    conn = psycopg2.connect(
         host=DB_CONFIG['host'],
         port=DB_CONFIG['port'],
         dbname=DB_CONFIG['dbname'],
         user=DB_CONFIG['user'],
-        password=DB_CONFIG['password']
+        password=DB_CONFIG['password'],
+        options='-c client_encoding=UTF8'
     )
     cur = conn.cursor()
 
@@ -80,8 +82,11 @@ def save_recommendations_to_db(recommendations):
     cur.execute("DELETE FROM recommendations WHERE algorithm = 'als'")
 
     # 写入新推荐
-    insert_sql = "INSERT INTO recommendations (user_id, movie_id, score, algorithm) VALUES (%s, %s, %s, 'als')"
-    cur.executemany(insert_sql, recommendations)
+    for rec in recommendations:
+        cur.execute(
+            "INSERT INTO recommendations (user_id, movie_id, score, algorithm) VALUES (%s, %s, %s, 'als')",
+            rec
+        )
     conn.commit()
 
     cur.close()
@@ -90,25 +95,25 @@ def save_recommendations_to_db(recommendations):
 
 def main():
     print("=" * 50)
-    print("开始 Spark ALS 推荐计算...")
+    print("Spark ALS Recommendation Engine")
     print("=" * 50)
 
     spark = get_spark_session()
     spark.sparkContext.setLogLevel("WARN")
 
-    # 1. 加载数据
-    print("[1/4] 从数据库加载评分数据...")
+    # 1. Load data
+    print("[1/4] Loading ratings...")
     ratings_df = load_ratings_from_db(spark)
     count = ratings_df.count()
-    print(f"  共 {count} 条评分记录")
+    print(f"  Total: {count} ratings")
 
     if count < 10:
-        print("  评分数据不足（<10条），跳过推荐计算")
+        print("  Not enough ratings (<10), skipping")
         spark.stop()
         return
 
-    # 2. 训练 ALS 模型
-    print("[2/4] 训练 ALS 协同过滤模型...")
+    # 2. Train ALS
+    print("[2/4] Training ALS model...")
     als = ALS(
         maxIter=10,
         regParam=0.1,
@@ -120,13 +125,12 @@ def main():
         nonnegative=True
     )
     model = als.fit(ratings_df)
-    print("  模型训练完成")
+    print("  Model trained")
 
-    # 3. 为所有用户生成 Top 10 推荐
-    print("[3/4] 生成用户推荐列表...")
+    # 3. Generate recommendations
+    print("[3/4] Generating recommendations...")
     user_recs = model.recommendForAllUsers(10)
 
-    # 展平推荐结果
     recs_flat = user_recs.select(
         col("user_id"),
         explode(col("recommendations")).alias("rec")
@@ -136,18 +140,17 @@ def main():
         col("rec.rating").alias("score")
     )
 
-    # 转为 Python 列表
     recs_list = recs_flat.collect()
     recommendations = [(r.user_id, r.movie_id, float(r.score)) for r in recs_list]
-    print(f"  生成了 {len(recommendations)} 条推荐记录")
+    print(f"  Generated {len(recommendations)} recommendations")
 
-    # 4. 写回数据库
-    print("[4/4] 将推荐结果写入数据库...")
+    # 4. Save to DB
+    print("[4/4] Saving to database...")
     save_recommendations_to_db(recommendations)
-    print(f"  写入完成")
+    print(f"  Done!")
 
     print("=" * 50)
-    print("推荐计算完成！")
+    print("ALS recommendation complete!")
     print("=" * 50)
 
     spark.stop()
